@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>每日收盤行情</title>
+    <!-- 引入 Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+            cursor: pointer;
+        }
+        th.sort-asc::after {
+            content: " 🔼"; /* 升序符號 */
+        }
+        th.sort-desc::after {
+            content: " 🔽"; /* 降序符號 */
+        }
+    </style>
+</head>
+<body>
+    <!-- 導航欄 -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light" style="font-size: 1.25rem; padding: 1rem 1.5rem;">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="index.html" style="font-size: 1.5rem;">我的網站</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="切換導航">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" aria-current="page" href="index.html">首頁</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="STOCK.html">股票API</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="air.html">空氣品質</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="swapi.html">SWAPI 星艦</a>
+                    </li>
+                </ul>
+                <!-- 搜尋框 -->
+                <form class="d-flex">
+                    <input id="searchInput" class="form-control me-2" type="text" placeholder="搜尋代號或名稱" aria-label="Search">
+                </form>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 內容區域 -->
+    <div class="container mt-4">
+        <h1 class="text-center">臺灣證券交易所每日收盤行情</h1>
+        <table id="stockTable" class="table table-bordered mt-3">
+            <thead class="table-light">
+                <tr>
+                    <th data-column="Code">代號</th>
+                    <th data-column="Name">名稱</th>
+                    <th data-column="TradeVolume">成交股數</th>
+                    <th data-column="TradeValue">成交金額</th>
+                    <th data-column="OpeningPrice">開盤價</th>
+                    <th data-column="HighestPrice">最高價</th>
+                    <th data-column="LowestPrice">最低價</th>
+                    <th data-column="ClosingPrice">收盤價</th>
+                    <th data-column="Change">漲跌價差</th>
+                    <th data-column="Transaction">成交筆數</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- 資料將動態插入此處 -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 引入 Bootstrap 的 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let originalData = []; // 儲存原始資料
+
+        // 使用 fetch 函數獲取 API 資料
+        fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                const tbody = document.querySelector('#stockTable tbody');
+                originalData = [...data]; // 儲存原始資料
+                renderTable(data, tbody);
+
+                // 啟用搜尋功能
+                const searchInput = document.getElementById('searchInput');
+                searchInput.addEventListener('input', () => filterTable(data, tbody, searchInput.value));
+
+                // 啟用排序功能
+                const headers = document.querySelectorAll('#stockTable th');
+                headers.forEach(header => {
+                    header.addEventListener('click', () => sortTable(header, data, tbody));
+                });
+            })
+            .catch(error => {
+                console.error('資料獲取失敗:', error);
+            });
+
+        // 渲染表格
+        function renderTable(data, tbody) {
+            tbody.innerHTML = '';
+            data.forEach(stock => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${stock.Code}</td>
+                    <td>${stock.Name}</td>
+                    <td>${stock.TradeVolume}</td>
+                    <td>${stock.TradeValue}</td>
+                    <td>${stock.OpeningPrice}</td>
+                    <td>${stock.HighestPrice}</td>
+                    <td>${stock.LowestPrice}</td>
+                    <td>${stock.ClosingPrice}</td>
+                    <td>${stock.Change}</td>
+                    <td>${stock.Transaction}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 搜尋功能
+        function filterTable(data, tbody, filter) {
+            const filteredData = data.filter(stock =>
+                stock.Code.toLowerCase().includes(filter.toLowerCase()) ||
+                stock.Name.toLowerCase().includes(filter.toLowerCase())
+            );
+            renderTable(filteredData, tbody);
+        }
+
+        // 排序功能
+        function sortTable(header, data, tbody) {
+            const column = header.getAttribute('data-column');
+            const currentOrder = header.classList.contains('sort-asc') ? 'asc' : 'desc';
+
+            // 移除所有標頭的排序符號
+            document.querySelectorAll('#stockTable th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+            });
+
+            if (currentOrder === 'asc') {
+                data.sort((a, b) => (a[column] > b[column] ? -1 : 1));
+                header.classList.add('sort-desc');
+            } else {
+                data.sort((a, b) => (a[column] > b[column] ? 1 : -1));
+                header.classList.add('sort-asc');
+            }
+
+            // 如果需要恢復原狀排序
+            if (header.classList.contains('sort-desc') && currentOrder === 'desc') {
+                data = [...originalData];
+                header.classList.remove('sort-desc');
+            }
+
+            renderTable(data, tbody);
+        }
+    </script>
+</body>
+</html>
